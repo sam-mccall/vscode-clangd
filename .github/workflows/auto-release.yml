@@ -1,4 +1,4 @@
-name: Publish to VSCode marketplace
+name: Publish release
 on:
   push:
     branches: [ master ]
@@ -27,8 +27,8 @@ jobs:
       if: steps.check.outputs.changed == 'true'
       with:
         artifacts: "vscode-clangd-*.vsix"
-        tag: steps.check.outputs.version
-        commit: steps.check.outputs.commit
+        tag: ${{ steps.check.outputs.version }}
+        commit: ${{ steps.check.outputs.commit }}
         token: ${{ secrets.GITHUB_TOKEN }}
     - name: publish
       if: steps.check.outputs.changed == 'true'
