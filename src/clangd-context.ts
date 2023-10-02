@@ -34,6 +34,10 @@ class ClangdLanguageClient extends vscodelc.LanguageClient {
   // For user-interactive operations (e.g. applyFixIt, applyTweaks), we will
   // prompt up the failure to users.
 
+  stop(timeout?: number): Promise<void> {
+    return Promise.resolve();
+  }
+
   handleFailedRequest<T>(type: vscodelc.MessageSignature, error: any,
                          token: vscode.CancellationToken|undefined,
                          defaultValue: T): T {
@@ -60,6 +64,13 @@ export interface ServerContext {
   extensionUri: string;
   commandPort: MessagePort;
   stdoutPort: MessagePort;
+  stdinBuffer: SharedArrayBuffer;
+}
+
+export interface ServerProcessContext {
+  extensionUri: string;
+  commandPort: MessagePort;
+  stdoutPort: MessagePort;
   stderrPort: MessagePort;
   stdinBuffer: SharedArrayBuffer;
 }
@@ -68,12 +79,12 @@ function setupServer(extensionUri: vscode.Uri, context: ServerContext): Worker {
   const workerPath = vscode.Uri.joinPath(extensionUri, "./dist/server.js");
   const worker = new Worker(workerPath.toString(true));
 
-  worker.postMessage(context, [ context.commandPort, context.stdoutPort, context.stderrPort ]);
+  worker.postMessage(context, [ context.commandPort, context.stdoutPort ]);
 
   return worker;
 }
 
-function setupServerProcess(extensionUri: vscode.Uri, context: ServerContext): Worker {
+function setupServerProcess(extensionUri: vscode.Uri, context: ServerProcessContext): Worker {
   const workerPath = vscode.Uri.joinPath(extensionUri, "./dist/serverProcess.js");
   const worker = new Worker(workerPath.toString(true));
 
@@ -107,13 +118,12 @@ export class ClangdContext implements vscode.Disposable {
       extensionUri: extensionUri.toString(),
       commandPort: commandChannel.port1,
       stdoutPort: stdoutChannel.port1,
-      stderrPort: stderrChannel.port1,
       stdinBuffer
     };
 
     const clangd = setupServer(extensionUri, serverContext);
 
-    const serverProcessContext: ServerContext = {
+    const serverProcessContext: ServerProcessContext = {
       extensionUri: extensionUri.toString(),
       commandPort: commandChannel.port2,
       stdoutPort: stdoutChannel.port2,
@@ -122,6 +132,15 @@ export class ClangdContext implements vscode.Disposable {
     };
 
     const clangdProcess = setupServerProcess(extensionUri, serverProcessContext);
+
+    const stderrPort = stderrChannel.port1;
+
+    stderrPort.addEventListener("message", e => {
+      if (typeof e.data === "string") {
+        outputChannel.appendLine(e.data);
+      }
+    });
+    stderrPort.start();
 
     const clientOptions: vscodelc.LanguageClientOptions = {
       // Register the server for c-family and cuda files.

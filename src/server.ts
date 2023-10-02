@@ -8,7 +8,6 @@ self.onmessage = function(e) {
 
     const commandPort = context.commandPort;
     const stdoutPort = context.stdoutPort;
-    const stderrPort = context.stderrPort;
     const stdinBuffer = context.stdinBuffer;
 
     const stdinSignal = new Int32Array(stdinBuffer, 0, 1);
@@ -26,12 +25,10 @@ self.onmessage = function(e) {
         const message = `Content-Length: ${ text.length }\r\n\r\n${ text }`
         const buffer = textEncoder.encode(message);
 
-        console.log(message);
+        console.log("--- " + text);
 
         stdinLength[0] = buffer.length;
         stdinRawBuffer.set(buffer);
-        
-        console.log("Send Length:" + stdinLength[0]);
         
         Atomics.store(stdinSignal, 0, 1);
         Atomics.notify(stdinSignal, 0);
@@ -43,7 +40,7 @@ self.onmessage = function(e) {
             const body = text.substring(text.search("{"));
 
             const response = JSON.parse(body) as ResponseMessage;
-            console.log(response);
+            console.log("<-- " + body);
             messageWriter.write(response);
         }
     });

@@ -1,4 +1,4 @@
-console.log("launched server process");
+console.log("Launched server process");
 
 function initialize(data) {
     /** @type { MessagePort } */
@@ -18,22 +18,20 @@ function initialize(data) {
     const textDecoder = new TextDecoder();
 
     self.Module = {
+        arguments: [ "--log=verbose" ],
+        thisProgram: "/usr/bin/clangd.wasm",
         stdin() {
             while (stdinData.length === 0) {
-                console.log("waiting input...")
                 Atomics.wait(stdinSignal, 0, 0, 10000);
-                console.log("Recieve Length: " + stdinLength[0]);
                 Atomics.store(stdinSignal, 0, 0);
 
                 const stdinBuffer = [...stdinRawBuffer.slice(0, stdinLength[0])];
+
+                console.log("--> " + textDecoder.decode(stdinRawBuffer.slice(0, stdinLength[0])));
                 stdinData.push(...stdinBuffer, null);
             }
             return stdinData.shift();
         },
-        // print(text) {
-        //     console.log("Process: " + text);
-        //     stdoutPort.postMessage(text);
-        // },
         stdout(char) {
             stdoutData.push(char);
 
@@ -49,35 +47,39 @@ function initialize(data) {
                 const buffer = new Uint8Array(stdoutData);
                 const text = textDecoder.decode(buffer);
 
-                console.log("Process: " + text);
+                console.log("--- " + text);
+
                 stdoutPort.postMessage(text);
 
                 stdoutData = [];
             }
         },
         printErr(text) {
-            console.log("Process Error: " + text);
+            console.log("ServerProcess: " + text);
             stderrPort.postMessage(text);
         },
         locateFile(url) {
             return extensionUri + "/dist/" + url;
         },
-        createWorker(url) {
-            console.log("new worker:" + url);
+        mainScriptUrlOrBlob: extensionUri + "/dist/clangd.js",
+        createWorker(url) {        
             
-            const blob = new Blob([
-                `
-                    self.Module = {
-                        locateFile(url) {
-                            return "${extensionUri}/dist/" + url;
-                        }
-                    };
-                    importScripts("${url}");
-                `   
-            ]);
-                
-            const blobURL = URL.createObjectURL(blob);
-            return new Worker(blobURL);
+                const blob = new Blob([
+                    `
+                        self.Module = {
+                            locateFile(url) {
+                                console.log(url);
+                                return "${extensionUri}/dist/" + url;
+                            }
+                        };
+                        
+                        importScripts("${url}");
+                    `   
+                ], { type: "text/javascript" });
+                    
+                const blobURL = URL.createObjectURL(blob);
+                const worker = new Worker(blobURL, { name: "clangdThread" });
+                return worker;
         }
     };
 
