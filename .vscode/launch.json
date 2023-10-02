@@ -9,7 +9,22 @@
             "runtimeExecutable": "${execPath}",
             "args": ["--extensionDevelopmentPath=${workspaceRoot}" ],
             "sourceMaps": true,
-            "outFiles": [ "${workspaceRoot}/out/**/*.js" ],
+            "outFiles": [ 
+                "${workspaceRoot}/dist/*.js",
+                "${workspaceRoot}/dist/*.wasm"
+            ],
+            "preLaunchTask": "npm: compile"
+        },
+        {
+            "name": "Launch Extension (Web)",
+            "type": "extensionHost",
+            "request": "launch",
+            "args": ["--extensionDevelopmentPath=${workspaceRoot}", "--extensionDevelopmentKind=web" ],
+            "sourceMaps": true,
+            "outFiles": [ 
+                "${workspaceRoot}/dist/*.js",
+                "${workspaceRoot}/dist/*.wasm"
+            ],
             "preLaunchTask": "npm: compile"
         },
         {

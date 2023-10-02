@@ -1,5 +1,5 @@
 import * as vscode from 'vscode';
-import * as vscodelc from 'vscode-languageclient/node';
+import * as vscodelc from 'vscode-languageclient/browser';
 
 import * as ast from './ast';
 import * as config from './config';
@@ -7,7 +7,7 @@ import * as configFileWatcher from './config-file-watcher';
 import * as fileStatus from './file-status';
 import * as inactiveRegions from './inactive-regions';
 import * as inlayHints from './inlay-hints';
-import * as install from './install';
+// import * as install from './install';
 import * as memoryUsage from './memory-usage';
 import * as openConfig from './open-config';
 import * as switchSourceHeader from './switch-source-header';
@@ -56,27 +56,72 @@ class EnableEditsNearCursorFeature implements vscodelc.StaticFeature {
   dispose() {}
 }
 
+export interface ServerContext {
+  extensionUri: string;
+  commandPort: MessagePort;
+  stdoutPort: MessagePort;
+  stderrPort: MessagePort;
+  stdinBuffer: SharedArrayBuffer;
+}
+
+function setupServer(extensionUri: vscode.Uri, context: ServerContext): Worker {
+  const workerPath = vscode.Uri.joinPath(extensionUri, "./dist/server.js");
+  const worker = new Worker(workerPath.toString(true));
+
+  worker.postMessage(context, [ context.commandPort, context.stdoutPort, context.stderrPort ]);
+
+  return worker;
+}
+
+function setupServerProcess(extensionUri: vscode.Uri, context: ServerContext): Worker {
+  const workerPath = vscode.Uri.joinPath(extensionUri, "./dist/serverProcess.js");
+  const worker = new Worker(workerPath.toString(true));
+
+  worker.postMessage(context, [ context.commandPort, context.stdoutPort, context.stderrPort ]);
+
+  return worker;
+}
+
 export class ClangdContext implements vscode.Disposable {
   subscriptions: vscode.Disposable[] = [];
   client!: ClangdLanguageClient;
 
-  async activate(globalStoragePath: string,
+  async activate(extensionUri: vscode.Uri,
                  outputChannel: vscode.OutputChannel) {
-    const clangdPath = await install.activate(this, globalStoragePath);
-    if (!clangdPath)
-      return;
+    // const clangdPath = await install.activate(this, globalStoragePath);
+    // if (!clangdPath)
+    //   return;
+    
+    // const traceFile = config.get<string>('trace');
+    // if (!!traceFile) {
+    //   const trace = {CLANGD_TRACE: traceFile};
+    //   clangd.options = {env: {...process.env, ...trace}};
+    // }
 
-    const clangd: vscodelc.Executable = {
-      command: clangdPath,
-      args: await config.get<string[]>('arguments'),
-      options: {cwd: vscode.workspace.rootPath || process.cwd()}
+    const commandChannel = new MessageChannel();
+    const stdoutChannel = new MessageChannel();
+    const stderrChannel = new MessageChannel();
+    const stdinBuffer = new SharedArrayBuffer(64 * 1024 + 8);
+
+    const serverContext: ServerContext = {
+      extensionUri: extensionUri.toString(),
+      commandPort: commandChannel.port1,
+      stdoutPort: stdoutChannel.port1,
+      stderrPort: stderrChannel.port1,
+      stdinBuffer
     };
-    const traceFile = config.get<string>('trace');
-    if (!!traceFile) {
-      const trace = {CLANGD_TRACE: traceFile};
-      clangd.options = {env: {...process.env, ...trace}};
-    }
-    const serverOptions: vscodelc.ServerOptions = clangd;
+
+    const clangd = setupServer(extensionUri, serverContext);
+
+    const serverProcessContext: ServerContext = {
+      extensionUri: extensionUri.toString(),
+      commandPort: commandChannel.port2,
+      stdoutPort: stdoutChannel.port2,
+      stderrPort: stderrChannel.port2,
+      stdinBuffer
+    };
+
+    const clangdProcess = setupServerProcess(extensionUri, serverProcessContext);
 
     const clientOptions: vscodelc.LanguageClientOptions = {
       // Register the server for c-family and cuda files.
@@ -150,8 +195,8 @@ export class ClangdContext implements vscode.Disposable {
       },
     };
 
-    this.client = new ClangdLanguageClient('Clang Language Server',
-                                           serverOptions, clientOptions);
+    this.client = new ClangdLanguageClient('vscode-clangd-web',
+        'Clang Language Server', clientOptions, clangd);
     this.client.clientOptions.errorHandler =
         this.client.createDefaultErrorHandler(
             // max restart count

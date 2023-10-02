@@ -10,7 +10,7 @@ export async function activate(context: vscode.ExtensionContext) {
   const outputChannel = vscode.window.createOutputChannel('clangd');
   context.subscriptions.push(outputChannel);
 
-  const clangdContext = new ClangdContext;
+  const clangdContext = new ClangdContext();
   context.subscriptions.push(clangdContext);
 
   // An empty place holder for the activate command, otherwise we'll get an
@@ -20,10 +20,10 @@ export async function activate(context: vscode.ExtensionContext) {
   context.subscriptions.push(
       vscode.commands.registerCommand('clangd.restart', async () => {
         await clangdContext.dispose();
-        await clangdContext.activate(context.globalStoragePath, outputChannel);
+        await clangdContext.activate(context.extensionUri, outputChannel);
       }));
 
-  await clangdContext.activate(context.globalStoragePath, outputChannel);
+  await clangdContext.activate(context.extensionUri, outputChannel);
 
   const shouldCheck = vscode.workspace.getConfiguration('clangd').get(
       'detectExtensionConflicts');

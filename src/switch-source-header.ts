@@ -1,5 +1,5 @@
 import * as vscode from 'vscode';
-import * as vscodelc from 'vscode-languageclient/node';
+import * as vscodelc from 'vscode-languageclient/browser';
 
 import {ClangdContext} from './clangd-context';
 

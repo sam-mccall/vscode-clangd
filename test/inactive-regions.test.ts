@@ -1,6 +1,6 @@
 import * as sinon from 'sinon';
 import * as vscode from 'vscode';
-import * as vscodelc from 'vscode-languageclient/node';
+import * as vscodelc from 'vscode-languageclient/browser';
 
 import {ClangdContext} from '../src/clangd-context';
 import * as config from '../src/config';
@@ -10,7 +10,7 @@ import * as mocks from './mocks';
 
 class MockClangdContext implements ClangdContext {
   subscriptions: vscode.Disposable[] = [];
-  client = new vscodelc.LanguageClient('', {command: ''}, {});
+  client = new vscodelc.LanguageClient('', '', {}, new Worker(""));
 
   visibleClangdEditors: vscode.TextEditor[] = [];
 

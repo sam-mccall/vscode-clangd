@@ -1,4 +1,4 @@
-import * as os from 'os'
+// import * as os from 'os'
 import * as path from 'path'
 import * as vscode from 'vscode';
 
@@ -8,22 +8,22 @@ import {ClangdContext} from './clangd-context';
  * @returns The path that corresponds to llvm::sys::path::user_config_directory.
  */
 function getUserConfigDirectory(): string|undefined {
-  switch (os.platform()) {
-  case 'win32':
-    if (process.env.LocalAppData)
-      return process.env.LocalAppData;
-    break;
-  case 'darwin':
-    if (process.env.HOME)
-      return path.join(process.env.HOME, 'Library', 'Preferences');
-    break;
-  default:
-    if (process.env.XDG_CONFIG_HOME)
-      return process.env.XDG_CONFIG_HOME;
-    if (process.env.HOME)
-      return path.join(process.env.HOME, '.config');
-    break;
-  }
+  // switch (os.platform()) {
+  // case 'win32':
+  //   if (process.env.LocalAppData)
+  //     return process.env.LocalAppData;
+  //   break;
+  // case 'darwin':
+  //   if (process.env.HOME)
+  //     return path.join(process.env.HOME, 'Library', 'Preferences');
+  //   break;
+  // default:
+  //   if (process.env.XDG_CONFIG_HOME)
+  //     return process.env.XDG_CONFIG_HOME;
+  //   if (process.env.HOME)
+  //     return path.join(process.env.HOME, '.config');
+  //   break;
+  // }
   return undefined;
 }
 

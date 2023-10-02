@@ -3,5 +3,5 @@
 !*.png
 !doc-assets/**
 !icon.png
-!out/bundle.js
+!dist/
 !package.json
