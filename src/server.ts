@@ -6,7 +6,6 @@ self.onmessage = function(e) {
 
     const context = e.data as ServerContext;
 
-    const commandPort = context.commandPort;
     const stdoutPort = context.stdoutPort;
     const stdinBuffer = context.stdinBuffer;
 
@@ -25,8 +24,6 @@ self.onmessage = function(e) {
         const message = `Content-Length: ${ text.length }\r\n\r\n${ text }`
         const buffer = textEncoder.encode(message);
 
-        console.log("--- " + text);
-
         stdinLength[0] = buffer.length;
         stdinRawBuffer.set(buffer);
         
@@ -40,7 +37,6 @@ self.onmessage = function(e) {
             const body = text.substring(text.search("{"));
 
             const response = JSON.parse(body) as ResponseMessage;
-            console.log("<-- " + body);
             messageWriter.write(response);
         }
     });

@@ -62,7 +62,6 @@ class EnableEditsNearCursorFeature implements vscodelc.StaticFeature {
 
 export interface ServerContext {
   extensionUri: string;
-  commandPort: MessagePort;
   stdoutPort: MessagePort;
   stdinBuffer: SharedArrayBuffer;
 }
@@ -79,7 +78,7 @@ function setupServer(extensionUri: vscode.Uri, context: ServerContext): Worker {
   const workerPath = vscode.Uri.joinPath(extensionUri, "./dist/server.js");
   const worker = new Worker(workerPath.toString(true));
 
-  worker.postMessage(context, [ context.commandPort, context.stdoutPort ]);
+  worker.postMessage(context, [ context.stdoutPort ]);
 
   return worker;
 }
@@ -116,7 +115,6 @@ export class ClangdContext implements vscode.Disposable {
 
     const serverContext: ServerContext = {
       extensionUri: extensionUri.toString(),
-      commandPort: commandChannel.port1,
       stdoutPort: stdoutChannel.port1,
       stdinBuffer
     };
@@ -134,6 +132,7 @@ export class ClangdContext implements vscode.Disposable {
     const clangdProcess = setupServerProcess(extensionUri, serverProcessContext);
 
     const stderrPort = stderrChannel.port1;
+    const commandPort = commandChannel.port1;
 
     stderrPort.addEventListener("message", e => {
       if (typeof e.data === "string") {
@@ -142,6 +141,33 @@ export class ClangdContext implements vscode.Disposable {
     });
     stderrPort.start();
 
+    vscode.workspace.onDidOpenTextDocument(e => {
+      const uri = e.uri;
+      const buffer = e.getText();
+
+      commandPort.postMessage({
+        type: "create",
+        data: {
+          path: uri.path,
+          buffer: buffer
+        }
+      });
+    });
+
+    vscode.workspace.onDidChangeTextDocument(e => {
+      const uri = e.document.uri;
+      const buffer = e.document.getText();
+
+      commandPort.postMessage({
+        type: "change",
+        data: {
+          path: uri.path,
+          buffer: buffer
+        }
+      });
+    });
+   
+    
     const clientOptions: vscodelc.LanguageClientOptions = {
       // Register the server for c-family and cuda files.
       documentSelector: clangdDocumentSelector,

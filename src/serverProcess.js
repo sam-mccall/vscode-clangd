@@ -2,6 +2,8 @@ console.log("Launched server process");
 
 function initialize(data) {
     /** @type { MessagePort } */
+    const commandPort = data.commandPort;
+    /** @type { MessagePort } */
     const stdoutPort = data.stdoutPort;
     /** @type { MessagePort } */
     const stderrPort = data.stderrPort;
@@ -18,7 +20,7 @@ function initialize(data) {
     const textDecoder = new TextDecoder();
 
     self.Module = {
-        arguments: [ "--log=verbose" ],
+        arguments: [ ],
         thisProgram: "/usr/bin/clangd.wasm",
         stdin() {
             while (stdinData.length === 0) {
@@ -26,8 +28,6 @@ function initialize(data) {
                 Atomics.store(stdinSignal, 0, 0);
 
                 const stdinBuffer = [...stdinRawBuffer.slice(0, stdinLength[0])];
-
-                console.log("--> " + textDecoder.decode(stdinRawBuffer.slice(0, stdinLength[0])));
                 stdinData.push(...stdinBuffer, null);
             }
             return stdinData.shift();
@@ -47,43 +47,62 @@ function initialize(data) {
                 const buffer = new Uint8Array(stdoutData);
                 const text = textDecoder.decode(buffer);
 
-                console.log("--- " + text);
-
                 stdoutPort.postMessage(text);
 
                 stdoutData = [];
             }
         },
         printErr(text) {
-            console.log("ServerProcess: " + text);
             stderrPort.postMessage(text);
         },
         locateFile(url) {
             return extensionUri + "/dist/" + url;
         },
         mainScriptUrlOrBlob: extensionUri + "/dist/clangd.js",
-        createWorker(url) {        
-            
-                const blob = new Blob([
-                    `
-                        self.Module = {
-                            locateFile(url) {
-                                console.log(url);
-                                return "${extensionUri}/dist/" + url;
-                            }
-                        };
-                        
-                        importScripts("${url}");
-                    `   
-                ], { type: "text/javascript" });
-                    
-                const blobURL = URL.createObjectURL(blob);
-                const worker = new Worker(blobURL, { name: "clangdThread" });
-                return worker;
+    };
+
+    const originalWorker = Worker;
+
+    self.Worker = function(url, option) {
+        const blob = new Blob([ `importScripts("${url}");` ], { type: "text/javascript" });            
+        const blobURL = URL.createObjectURL(blob);
+        if (!option) {
+            option = { name: "clangd Worker" };
         }
+        return new originalWorker(blobURL, option);
     };
 
     importScripts(extensionUri + "/dist/clangd.js");
+
+    commandPort.onmessage = function (e) {
+        const data = e.data;
+
+        if (data.type === "create" || data.type === "change") {
+            const fsPath = data.data.path;
+            const buffer = data.data.buffer;
+
+            const components = fsPath.split("/");
+            let creatingPath = "/";
+
+            for (let i = 1; i < components.length - 1; i++) {
+                creatingPath += components[i];
+                try {
+                    FS.mkdir(creatingPath);
+                } catch (e) {
+                    // ignore
+                }
+            }
+
+            FS.writeFile(fsPath, buffer);
+        }
+    };
+
+    FS.mkdir("/home/web_user/.config/");
+    FS.mkdir("/home/web_user/.config/clangd");
+    FS.writeFile("/home/web_user/.config/clangd/config.yaml", `
+CompileFlags:\n
+    Add: [--target=wasm32-unknown]     
+    `);
 }
 
 self.onmessage = function(e) {
