@@ -17,6 +17,7 @@ function initialize(data) {
     const stdinData = [];
     let stdoutData = [];
     let carretCount = 0;
+    const textEncoder = new TextEncoder();
     const textDecoder = new TextDecoder();
 
     self.Module = {
@@ -24,7 +25,10 @@ function initialize(data) {
         thisProgram: "/usr/bin/clangd.wasm",
         stdin() {
             while (stdinData.length === 0) {
-                Atomics.wait(stdinSignal, 0, 0, 10000);
+                if (Atomics.wait(stdinSignal, 0, 0, 200) == "timed-out") {
+                    stdinData.push(...textEncoder.encode("Content-Length: 0\r\n\r\n"), null);
+                    break;
+                }
                 Atomics.store(stdinSignal, 0, 0);
 
                 const stdinBuffer = [...stdinRawBuffer.slice(0, stdinLength[0])];

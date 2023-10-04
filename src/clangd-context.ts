@@ -166,7 +166,6 @@ export class ClangdContext implements vscode.Disposable {
         }
       });
     });
-   
     
     const clientOptions: vscodelc.LanguageClientOptions = {
       // Register the server for c-family and cuda files.
