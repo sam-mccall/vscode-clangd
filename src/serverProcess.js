@@ -69,9 +69,9 @@ CompileFlags:
     );
 
     await Promise.all([
-        fetchAndInstallHeaders(extensionUri + "/dist/clang_includes.zip", "/usr/include/"),
-        fetchAndInstallHeaders(extensionUri + "/dist/emscripten_includes.zip", "/usr/include/emscripten/"),
-        fetchAndInstallHeaders(extensionUri + "/dist/Siv3D_includes.zip", "/usr/include/Siv3D/")
+        fetchAndInstallHeaders(extensionUri + "/clangd/clang_includes.zip", "/usr/include/"),
+        fetchAndInstallHeaders(extensionUri + "/clangd/emscripten_includes.zip", "/usr/include/emscripten/"),
+        fetchAndInstallHeaders(extensionUri + "/clangd/Siv3D_includes.zip", "/usr/include/Siv3D/")
     ]);
 }
 
@@ -140,7 +140,10 @@ async function initialize(data) {
                 const buffer = new Uint8Array(stdoutData);
                 const text = textDecoder.decode(buffer);
 
-                stdoutPort.postMessage(text);
+                stdoutPort.postMessage({
+                    type: "stdout",
+                    data: text
+                });
 
                 stdoutData = [];
             }
@@ -149,12 +152,18 @@ async function initialize(data) {
             stderrPort.postMessage(text);
         },
         locateFile(url) {
-            return extensionUri + "/dist/" + url;
+            return extensionUri + "/clangd/" + url;
         },
-        mainScriptUrlOrBlob: extensionUri + "/dist/clangd.js",
+        mainScriptUrlOrBlob: extensionUri + "/clangd/clangd.js",
+        onExit(code) {
+            stdoutPort.postMessage({ 
+                type: "exit",
+                code
+            })
+        }
     };
 
-    importScripts(extensionUri + "/dist/clangd.js");
+    importScripts(extensionUri + "/clangd/clangd.js");
 
     stdinPort.onmessage = function(e) {
         const data = e.data;

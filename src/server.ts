@@ -24,12 +24,24 @@ self.onmessage = function(e) {
     });
 
     stdoutPort.addEventListener("message", (e) => {
-        if (typeof e.data === "string") {
-            const text = e.data;
+        const data = e.data as {
+            type: string,
+            data: any
+        } | undefined;
+
+        if (!data) {
+            return;
+        }
+
+        if (data.type === "stdout") {
+            const text = data.data as string;
             const body = text.substring(text.search("{"));
 
             const response = JSON.parse(body) as ResponseMessage;
             messageWriter.write(response);
+        } else if (data.type === "exit") {
+            messageWriter.end();
+            messageWriter.dispose();
         }
     });
     stdoutPort.start();
