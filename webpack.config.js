@@ -81,11 +81,8 @@ const browserServerConfig = {
 						loader: 'ts-loader',
 					},
 				],
-			},
+			}
 		],
-	},
-	externals: {
-		vscode: 'commonjs vscode', // ignored because it doesn't exist
 	},
 	output: {
 		libraryTarget: 'commonjs2',

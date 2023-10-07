@@ -45,10 +45,12 @@
         "package": "webpack --mode production --devtool hidden-source-map && vsce package --baseImagesUrl https://raw.githubusercontent.com/clangd/vscode-clangd/master/",
         "publish": "vsce publish --baseImagesUrl https://raw.githubusercontent.com/clangd/vscode-clangd/master/",
         "publish-openvsx": "ovsx publish --baseImagesUrl https://raw.githubusercontent.com/clangd/vscode-clangd/master/",
-        "git-clang-format": "git-clang-format --extensions=ts"
+        "git-clang-format": "git-clang-format --extensions=ts",
+        "serve": "npx '@vscode/test-web' --coi --extensionPath=. --browser=none"
     },
     "dependencies": {
         "@clangd/install": "0.1.16",
+        "@zip.js/zip.js": "^2.7.29",
         "abort-controller": "^3.0.0",
         "util": "^0.12.5",
         "vscode-languageclient": "8.0.2",
@@ -83,7 +85,10 @@
         "untrustedWorkspaces": {
             "supported": "limited",
             "description": "In restricted mode clangd.path and clangd.arguments are not respected.",
-            "restrictedConfigurations": ["clangd.path", "clangd.arguments"]
+            "restrictedConfigurations": [
+                "clangd.path",
+                "clangd.arguments"
+            ]
         }
     },
     "contributes": {

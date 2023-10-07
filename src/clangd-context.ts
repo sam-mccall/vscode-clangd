@@ -33,11 +33,6 @@ class ClangdLanguageClient extends vscodelc.LanguageClient {
   //
   // For user-interactive operations (e.g. applyFixIt, applyTweaks), we will
   // prompt up the failure to users.
-
-  stop(timeout?: number): Promise<void> {
-    return Promise.resolve();
-  }
-
   handleFailedRequest<T>(type: vscodelc.MessageSignature, error: any,
                          token: vscode.CancellationToken|undefined,
                          defaultValue: T): T {
@@ -62,23 +57,23 @@ class EnableEditsNearCursorFeature implements vscodelc.StaticFeature {
 
 export interface ServerContext {
   extensionUri: string;
+  stdinPort: MessagePort;
   stdoutPort: MessagePort;
-  stdinBuffer: SharedArrayBuffer;
 }
 
 export interface ServerProcessContext {
   extensionUri: string;
   commandPort: MessagePort;
+  stdinPort: MessagePort;
   stdoutPort: MessagePort;
   stderrPort: MessagePort;
-  stdinBuffer: SharedArrayBuffer;
 }
 
 function setupServer(extensionUri: vscode.Uri, context: ServerContext): Worker {
   const workerPath = vscode.Uri.joinPath(extensionUri, "./dist/server.js");
   const worker = new Worker(workerPath.toString(true));
 
-  worker.postMessage(context, [ context.stdoutPort ]);
+  worker.postMessage(context, [ context.stdinPort, context.stdoutPort ]);
 
   return worker;
 }
@@ -87,7 +82,7 @@ function setupServerProcess(extensionUri: vscode.Uri, context: ServerProcessCont
   const workerPath = vscode.Uri.joinPath(extensionUri, "./dist/serverProcess.js");
   const worker = new Worker(workerPath.toString(true));
 
-  worker.postMessage(context, [ context.commandPort, context.stdoutPort, context.stderrPort ]);
+  worker.postMessage(context, [ context.stdinPort, context.commandPort, context.stdoutPort, context.stderrPort ]);
 
   return worker;
 }
@@ -109,27 +104,41 @@ export class ClangdContext implements vscode.Disposable {
     // }
 
     const commandChannel = new MessageChannel();
+    const stdinChannel = new MessageChannel();
     const stdoutChannel = new MessageChannel();
     const stderrChannel = new MessageChannel();
-    const stdinBuffer = new SharedArrayBuffer(64 * 1024 + 8);
 
     const serverContext: ServerContext = {
       extensionUri: extensionUri.toString(),
-      stdoutPort: stdoutChannel.port1,
-      stdinBuffer
+      stdinPort: stdinChannel.port1,
+      stdoutPort: stdoutChannel.port1
     };
 
     const clangd = setupServer(extensionUri, serverContext);
+    const clangdDisposable = {
+      clangd,
+      dispose() {
+        this.clangd.terminate();
+      }
+    };
+    this.subscriptions.push(clangdDisposable);
 
     const serverProcessContext: ServerProcessContext = {
       extensionUri: extensionUri.toString(),
       commandPort: commandChannel.port2,
+      stdinPort: stdinChannel.port2,
       stdoutPort: stdoutChannel.port2,
-      stderrPort: stderrChannel.port2,
-      stdinBuffer
+      stderrPort: stderrChannel.port2
     };
 
     const clangdProcess = setupServerProcess(extensionUri, serverProcessContext);
+    const clangdProcessDisposable = {
+      clangdProcess,
+      dispose() {
+        this.clangdProcess.terminate();
+      }
+    };
+    this.subscriptions.push(clangdProcessDisposable);
 
     const stderrPort = stderrChannel.port1;
     const commandPort = commandChannel.port1;
@@ -141,9 +150,32 @@ export class ClangdContext implements vscode.Disposable {
     });
     stderrPort.start();
 
+    for (const workspace of (vscode.workspace.workspaceFolders || [])) {
+      const files = await vscode.workspace.fs.readDirectory(workspace.uri);
+      for (const [ filename, filetype ] of files) {
+        if (filetype === vscode.FileType.File) {
+          const filePath = vscode.Uri.joinPath(workspace.uri, filename);
+          const content = await vscode.workspace.fs.readFile(filePath);
+          commandPort.postMessage({
+            type: "create",
+            data: {
+              path: filePath.path,
+              buffer: content.buffer,
+              offset: content.byteOffset,
+              length: content.byteLength
+            }
+          }, [ content.buffer ]);
+        }
+      }
+    }
+
     vscode.workspace.onDidOpenTextDocument(e => {
       const uri = e.uri;
       const buffer = e.getText();
+
+      if (uri.scheme === "output") {
+        return;
+      }
 
       commandPort.postMessage({
         type: "create",
@@ -157,6 +189,10 @@ export class ClangdContext implements vscode.Disposable {
     vscode.workspace.onDidChangeTextDocument(e => {
       const uri = e.document.uri;
       const buffer = e.document.getText();
+
+      if (uri.scheme === "output") {
+        return;
+      }
 
       commandPort.postMessage({
         type: "change",

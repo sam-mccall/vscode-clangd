@@ -6,12 +6,8 @@ self.onmessage = function(e) {
 
     const context = e.data as ServerContext;
 
+    const stdinPort = context.stdinPort;
     const stdoutPort = context.stdoutPort;
-    const stdinBuffer = context.stdinBuffer;
-
-    const stdinSignal = new Int32Array(stdinBuffer, 0, 1);
-    const stdinLength = new Uint32Array(stdinBuffer, 4, 1);
-    const stdinRawBuffer = new Uint8Array(stdinBuffer, 8);
 
     const textEncoder = new TextEncoder();
 
@@ -24,11 +20,7 @@ self.onmessage = function(e) {
         const message = `Content-Length: ${ text.length }\r\n\r\n${ text }`
         const buffer = textEncoder.encode(message);
 
-        stdinLength[0] = buffer.length;
-        stdinRawBuffer.set(buffer);
-        
-        Atomics.store(stdinSignal, 0, 1);
-        Atomics.notify(stdinSignal, 0);
+        stdinPort.postMessage({ type: "stdin", buffer: buffer.buffer }, [ buffer.buffer ]);
     });
 
     stdoutPort.addEventListener("message", (e) => {
