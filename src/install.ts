@@ -11,17 +11,18 @@
 
 // // Returns the clangd path to be used, or null if clangd is not installed.
 // export async function activate(
-//     context: ClangdContext, globalStoragePath: string): Promise<string|null> {
-//   // If the workspace overrides clangd.path, give the user a chance to bless it.
-//   await config.get<string>('path');
+//     context: ClangdContext, globalStoragePath: string):
+//     Promise<string|null> {
+//   // If the workspace overrides clangd.path, give the user a chance to bless
+//   it. await config.get<string>('path');
 
 //   const ui = new UI(context, globalStoragePath);
 //   context.subscriptions.push(vscode.commands.registerCommand(
 //       'clangd.install', async () => common.installLatest(ui)));
 //   context.subscriptions.push(vscode.commands.registerCommand(
 //       'clangd.update', async () => common.checkUpdates(true, ui)));
-//   const status = await common.prepare(ui, config.get<boolean>('checkUpdates'));
-//   return status.clangdPath;
+//   const status = await common.prepare(ui,
+//   config.get<boolean>('checkUpdates')); return status.clangdPath;
 // }
 
 // class UI {
@@ -29,7 +30,8 @@
 //               private globalStoragePath: string) {}
 
 //   get storagePath(): string { return this.globalStoragePath; }
-//   async choose(prompt: string, options: string[]): Promise<string|undefined> {
+//   async choose(prompt: string, options: string[]):
+//   Promise<string|undefined> {
 //     return await vscode.window.showInformationMessage(prompt, ...options);
 //   }
 //   slow<T>(title: string, result: Promise<T>) {
@@ -47,7 +49,8 @@
 //       title: title,
 //       cancellable: cancel !== null,
 //     };
-//     const result = vscode.window.withProgress(opts, async (progress, canc) => {
+//     const result = vscode.window.withProgress(opts, async (progress, canc)
+//     => {
 //       if (cancel)
 //         canc.onCancellationRequested((_) => cancel.abort());
 //       let lastFraction = 0;
@@ -102,11 +105,13 @@
 //     const update = `Install clangd ${newVersion}`;
 //     const dontCheck = 'Don\'t ask again';
 //     const response =
-//         await vscode.window.showInformationMessage(message, update, dontCheck);
+//         await vscode.window.showInformationMessage(message, update,
+//         dontCheck);
 //     if (response === update) {
 //       common.installLatest(this);
 //     } else if (response === dontCheck) {
-//       config.update('checkUpdates', false, vscode.ConfigurationTarget.Global);
+//       config.update('checkUpdates', false,
+//       vscode.ConfigurationTarget.Global);
 //     }
 //   }
 
@@ -125,7 +130,8 @@
 
 //   get clangdPath(): string {
 //     let p = config.get<string>('path')!;
-//     // Backwards compatibility: if it's a relative path with a slash, interpret
+//     // Backwards compatibility: if it's a relative path with a slash,
+//     interpret
 //     // relative to project root.
 //     if (!path.isAbsolute(p) && p.includes(path.sep) &&
 //         vscode.workspace.rootPath !== undefined)

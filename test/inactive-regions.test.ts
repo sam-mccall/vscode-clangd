@@ -10,7 +10,7 @@ import * as mocks from './mocks';
 
 class MockClangdContext implements ClangdContext {
   subscriptions: vscode.Disposable[] = [];
-  client = new vscodelc.LanguageClient('', '', {}, new Worker(""));
+  client = new vscodelc.LanguageClient('', '', {}, new Worker(''));
 
   visibleClangdEditors: vscode.TextEditor[] = [];
 

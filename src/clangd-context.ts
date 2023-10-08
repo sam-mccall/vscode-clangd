@@ -70,19 +70,24 @@ export interface ServerProcessContext {
 }
 
 function setupServer(extensionUri: vscode.Uri, context: ServerContext): Worker {
-  const workerPath = vscode.Uri.joinPath(extensionUri, "./dist/server.js");
+  const workerPath = vscode.Uri.joinPath(extensionUri, './dist/server.js');
   const worker = new Worker(workerPath.toString(true));
 
-  worker.postMessage(context, [ context.stdinPort, context.stdoutPort ]);
+  worker.postMessage(context, [context.stdinPort, context.stdoutPort]);
 
   return worker;
 }
 
-function setupServerProcess(extensionUri: vscode.Uri, context: ServerProcessContext): Worker {
-  const workerPath = vscode.Uri.joinPath(extensionUri, "./dist/serverProcess.js");
+function setupServerProcess(extensionUri: vscode.Uri,
+                            context: ServerProcessContext): Worker {
+  const workerPath =
+      vscode.Uri.joinPath(extensionUri, './dist/serverProcess.js');
   const worker = new Worker(workerPath.toString(true));
 
-  worker.postMessage(context, [ context.stdinPort, context.commandPort, context.stdoutPort, context.stderrPort ]);
+  worker.postMessage(context, [
+    context.stdinPort, context.commandPort, context.stdoutPort,
+    context.stderrPort
+  ]);
 
   return worker;
 }
@@ -96,7 +101,7 @@ export class ClangdContext implements vscode.Disposable {
     // const clangdPath = await install.activate(this, globalStoragePath);
     // if (!clangdPath)
     //   return;
-    
+
     // const traceFile = config.get<string>('trace');
     // if (!!traceFile) {
     //   const trace = {CLANGD_TRACE: traceFile};
@@ -115,12 +120,7 @@ export class ClangdContext implements vscode.Disposable {
     };
 
     const clangd = setupServer(extensionUri, serverContext);
-    const clangdDisposable = {
-      clangd,
-      dispose() {
-        this.clangd.terminate();
-      }
-    };
+    const clangdDisposable = {clangd, dispose() { this.clangd.terminate(); }};
     this.subscriptions.push(clangdDisposable);
 
     const serverProcessContext: ServerProcessContext = {
@@ -131,20 +131,19 @@ export class ClangdContext implements vscode.Disposable {
       stderrPort: stderrChannel.port2
     };
 
-    const clangdProcess = setupServerProcess(extensionUri, serverProcessContext);
+    const clangdProcess =
+        setupServerProcess(extensionUri, serverProcessContext);
     const clangdProcessDisposable = {
       clangdProcess,
-      dispose() {
-        this.clangdProcess.terminate();
-      }
+      dispose() { this.clangdProcess.terminate(); }
     };
     this.subscriptions.push(clangdProcessDisposable);
 
     const stderrPort = stderrChannel.port1;
     const commandPort = commandChannel.port1;
 
-    stderrPort.addEventListener("message", e => {
-      if (typeof e.data === "string") {
+    stderrPort.addEventListener('message', e => {
+      if (typeof e.data === 'string') {
         outputChannel.appendLine(e.data);
       }
     });
@@ -152,19 +151,20 @@ export class ClangdContext implements vscode.Disposable {
 
     for (const workspace of (vscode.workspace.workspaceFolders || [])) {
       const files = await vscode.workspace.fs.readDirectory(workspace.uri);
-      for (const [ filename, filetype ] of files) {
+      for (const [filename, filetype] of files) {
         if (filetype === vscode.FileType.File) {
           const filePath = vscode.Uri.joinPath(workspace.uri, filename);
           const content = await vscode.workspace.fs.readFile(filePath);
           commandPort.postMessage({
-            type: "create",
+            type: 'create',
             data: {
               path: filePath.path,
               buffer: content.buffer,
               offset: content.byteOffset,
               length: content.byteLength
             }
-          }, [ content.buffer ]);
+          },
+                                  [content.buffer]);
         }
       }
     }
@@ -173,36 +173,26 @@ export class ClangdContext implements vscode.Disposable {
       const uri = e.uri;
       const buffer = e.getText();
 
-      if (uri.scheme === "output") {
+      if (uri.scheme === 'output') {
         return;
       }
 
-      commandPort.postMessage({
-        type: "create",
-        data: {
-          path: uri.path,
-          buffer: buffer
-        }
-      });
+      commandPort.postMessage(
+          {type: 'create', data: {path: uri.path, buffer: buffer}});
     });
 
     vscode.workspace.onDidChangeTextDocument(e => {
       const uri = e.document.uri;
       const buffer = e.document.getText();
 
-      if (uri.scheme === "output") {
+      if (uri.scheme === 'output') {
         return;
       }
 
-      commandPort.postMessage({
-        type: "change",
-        data: {
-          path: uri.path,
-          buffer: buffer
-        }
-      });
+      commandPort.postMessage(
+          {type: 'change', data: {path: uri.path, buffer: buffer}});
     });
-    
+
     const clientOptions: vscodelc.LanguageClientOptions = {
       // Register the server for c-family and cuda files.
       documentSelector: clangdDocumentSelector,
@@ -275,8 +265,8 @@ export class ClangdContext implements vscode.Disposable {
       },
     };
 
-    this.client = new ClangdLanguageClient('vscode-clangd-web',
-        'Clang Language Server', clientOptions, clangd);
+    this.client = new ClangdLanguageClient(
+        'vscode-clangd-web', 'Clang Language Server', clientOptions, clangd);
     this.client.clientOptions.errorHandler =
         this.client.createDefaultErrorHandler(
             // max restart count
