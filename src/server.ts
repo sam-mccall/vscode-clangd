@@ -17,7 +17,7 @@ self.onmessage = function(e) {
     messageReader.listen(data => {
         const text = JSON.stringify(data);
 
-        const message = `Content-Length: ${ text.length }\r\n\r\n${ text }`
+        const message = `Content-Length: ${ textEncoder.encode(text).length }\r\n\r\n${ text }`
         const buffer = textEncoder.encode(message);
 
         stdinPort.postMessage({ type: "stdin", buffer: buffer.buffer }, [ buffer.buffer ]);
