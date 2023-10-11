@@ -1,4 +1,5 @@
-import { TextWriter, Uint8ArrayReader, ZipReader, fs } from "@zip.js/zip.js";
+import { TextWriter, Uint8ArrayReader, ZipReader } from "@zip.js/zip.js";
+import { ServerProcessContext } from "./clangd-context";
 
 console.log("Launched server process");
 
@@ -9,24 +10,21 @@ function patchWorker() {
     //
     const originalWorker = Worker;
 
-    self.Worker = function(url, option) {
-        const blob = new Blob([ `importScripts("${url}");` ], { type: "text/javascript" });            
-        const blobURL = URL.createObjectURL(blob);
-        if (!option) {
-            option = { name: "clangd Worker" };
+    self.Worker = class ProxyWorker extends originalWorker {
+        constructor(url: string | URL, option: WorkerOptions | undefined) {
+            const blob = new Blob([ `importScripts("${url}");` ], { type: "text/javascript" });            
+            const blobURL = URL.createObjectURL(blob);
+            if (!option) {
+                option = { name: "clangd Worker" };
+            }
+            super(blobURL, option);
         }
-        return new originalWorker(blobURL, option);
     };
 }
 
 patchWorker();
 
-/**
- * 
- * @param { string } path 
- * @param { string | Uint8Array } content 
- */
-function writeFile(path, content) {
+function writeFile(path: string, content: string | Uint8Array ) {
     const components = path.split("/");
     let creatingPath = "/";
 
@@ -38,11 +36,10 @@ function writeFile(path, content) {
             // ignore
         }
     }
-    console.log("writing: " + path);
     FS.writeFile(path, content);
 }
 
-async function fetchAndInstallHeaders(url, base) {
+async function fetchAndInstallHeaders(url: string, base: string) {
     const bootstrap = await fetch(url);
     const bootstrapBuffer = await bootstrap.arrayBuffer();
     
@@ -51,15 +48,16 @@ async function fetchAndInstallHeaders(url, base) {
     const files = await zipReader.getEntries(); 
 
     const promises = files.map(async file => {
+        if (!file.getData) return;
         const textWriter = new TextWriter("utf8");
-        const content = await file.getData(textWriter);
+        const content = await file.getData<string>(textWriter);
         writeFile(base + file.filename, content);
     });
     
     await Promise.all(promises); 
 }
 
-async function loadInitialFiles(extensionUri) {
+async function loadInitialFiles(extensionUri: string, includes: string[]) {
 
     writeFile("/home/web_user/.config/clangd/config.yaml",
     `
@@ -68,37 +66,40 @@ CompileFlags:
     `
     );
 
+    const promises = includes
+        .map(url => url.replace("${extensionUri}", extensionUri))
+        .map(url => fetchAndInstallHeaders(url, "/usr/include/"));
+
     await Promise.all([
-        fetchAndInstallHeaders(extensionUri + "/clangd/clang_includes.zip", "/usr/include/"),
-        fetchAndInstallHeaders(extensionUri + "/clangd/emscripten_includes.zip", "/usr/include/emscripten/"),
-        fetchAndInstallHeaders(extensionUri + "/clangd/Siv3D_includes.zip", "/usr/include/Siv3D/")
+        fetchAndInstallHeaders(extensionUri + "/clangd/clang_includes.zip", "/usr/include/clang/"),
+        ...promises
     ]);
 }
 
-async function initialize(data) {
-    /** @type { MessagePort } */
+declare global {
+    var Module: any;
+}
+
+async function initialize(data: ServerProcessContext) {
+  
     const commandPort = data.commandPort;
-    /** @type { MessagePort } */
     const stdinPort = data.stdinPort;
-    /** @type { MessagePort } */
     const stdoutPort = data.stdoutPort;
-    /** @type { MessagePort } */
     const stderrPort = data.stderrPort;
-    /** @type { string } */
     const extensionUri = data.extensionUri;
+    const processArguments = data.arguments || [];
+    const additionalPackage = data.additionalPackage;
     
-    /** @type { Uint8Array[] } */
-    const stdinQueue = [];
-    /** @type { number[] }  */
-    const stdinData = [];
-    let stdoutData = [];
+    const stdinQueue: Uint8Array[] = [];
+    const stdinData: (number | null)[] = [];
+    let stdoutData: number[] = [];
 
     let carretCount = 0;
     const textEncoder = new TextEncoder();
     const textDecoder = new TextDecoder();
 
     self.Module = {
-        arguments: [ ],
+        arguments: processArguments,
         thisProgram: "/usr/bin/clangd.wasm",
         waitForStdin() {
             if (stdinQueue.length === 0) {
@@ -118,12 +119,12 @@ async function initialize(data) {
                     break;
                 }
             
-                const stdinBuffer = stdinQueue.shift();
+                const stdinBuffer = stdinQueue.shift() || [];
                 stdinData.push(...stdinBuffer, null);
             }
             return stdinData.shift();
         },
-        stdout(char) {
+        stdout(char: number) {
             stdoutData.push(char);
 
             const prevCarretCount = carretCount;
@@ -148,14 +149,14 @@ async function initialize(data) {
                 stdoutData = [];
             }
         },
-        printErr(text) {
+        printErr(text: string) {
             stderrPort.postMessage(text);
         },
-        locateFile(url) {
+        locateFile(url: string) {
             return extensionUri + "/clangd/" + url;
         },
         mainScriptUrlOrBlob: extensionUri + "/clangd/clangd.js",
-        onExit(code) {
+        onExit(code: number) {
             stdoutPort.postMessage({ 
                 type: "exit",
                 code
@@ -203,7 +204,7 @@ async function initialize(data) {
         }
     };
 
-    await loadInitialFiles(extensionUri);
+    await loadInitialFiles(extensionUri, additionalPackage);
 }
 
 self.onmessage = function(e) {

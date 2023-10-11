@@ -52,11 +52,13 @@
         "@clangd/install": "0.1.16",
         "@zip.js/zip.js": "^2.7.29",
         "abort-controller": "^3.0.0",
+        "url": "^0.11.3",
         "util": "^0.12.5",
         "vscode-languageclient": "8.0.2",
         "vscode-languageserver": "8.0.2"
     },
     "devDependencies": {
+        "@types/emscripten": "^1.39.8",
         "@types/glob": "^7.1.1",
         "@types/mocha": "^7.0.2",
         "@types/node": "^6.0.40",
@@ -183,6 +185,32 @@
                     "type": "number",
                     "default": 0.55,
                     "description": "Opacity of inactive regions (used only if clangd.inactiveRegions.useBackgroundHighlight=false)"
+                },
+                "clangd.trackedFileExtensions": {
+                    "type": "array",
+                    "default": [
+                        ".c",
+                        ".cpp",
+                        ".h",
+                        ".hpp",
+                        ".clang-tidy",
+                        ".json"
+                    ],
+                    "items": {
+                        "type": "string"
+                    },
+                    "description": "Tracked file extensions"
+                },
+                "clangd.additionalIncludePackages": {
+                    "type": "array",
+                    "default": [
+                        "${extensionUri}/clangd/emscripten_includes.zip",
+                        "${extensionUri}/clangd/Siv3D_includes.zip"
+                    ],
+                    "items": {
+                        "type": "string"
+                    },
+                    "description": "Additional includes"
                 }
             }
         },

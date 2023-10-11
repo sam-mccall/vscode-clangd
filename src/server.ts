@@ -20,7 +20,8 @@ self.onmessage = function(e) {
   const messageWriter = new BrowserMessageWriter(self);
 
   messageReader.listen(data => {
-    const text = JSON.stringify(data);
+    let text = JSON.stringify(data);
+    text = text.replace(/([a-z0-9+\-.]+):\/([a-zA-Z0-9+\-\/\.]+)/g, "file://$1/$2");
 
     const message =
         `Content-Length: ${textEncoder.encode(text).length}\r\n\r\n${text}`
@@ -38,7 +39,8 @@ self.onmessage = function(e) {
     }
 
     if (data.type === 'stdout') {
-      const text = data.data as string;
+      let text = data.data as string;
+      text = text.replace(/file:\/\/([a-z0-9+\-.]+)\/([a-zA-Z0-9+\-\/\.]+)/, "$1:/$2");
       const body = text.substring(text.search('{'));
 
       const response = JSON.parse(body) as ResponseMessage;

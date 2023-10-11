@@ -12,13 +12,14 @@ import * as memoryUsage from './memory-usage';
 import * as openConfig from './open-config';
 import * as switchSourceHeader from './switch-source-header';
 import * as typeHierarchy from './type-hierarchy';
+import * as path from "path";
 
 export const clangdDocumentSelector = [
-  {scheme: 'file', language: 'c'},
-  {scheme: 'file', language: 'cpp'},
-  {scheme: 'file', language: 'cuda-cpp'},
-  {scheme: 'file', language: 'objective-c'},
-  {scheme: 'file', language: 'objective-cpp'},
+  {language: 'c'},
+  {language: 'cpp'},
+  {language: 'cuda-cpp'},
+  {language: 'objective-c'},
+  {language: 'objective-cpp'},
 ];
 
 export function isClangdDocument(document: vscode.TextDocument) {
@@ -67,6 +68,9 @@ export interface ServerProcessContext {
   stdinPort: MessagePort;
   stdoutPort: MessagePort;
   stderrPort: MessagePort;
+
+  arguments: string[];
+  additionalPackage: string[];
 }
 
 function setupServer(extensionUri: vscode.Uri, context: ServerContext): Worker {
@@ -92,6 +96,13 @@ function setupServerProcess(extensionUri: vscode.Uri,
   return worker;
 }
 
+function encodeUri(uri: vscode.Uri) {
+  return vscode.Uri.from({
+    scheme: "file",
+    path: `${uri.scheme}/${uri.path}`
+  });
+}
+
 export class ClangdContext implements vscode.Disposable {
   subscriptions: vscode.Disposable[] = [];
   client!: ClangdLanguageClient;
@@ -107,6 +118,10 @@ export class ClangdContext implements vscode.Disposable {
     //   const trace = {CLANGD_TRACE: traceFile};
     //   clangd.options = {env: {...process.env, ...trace}};
     // }
+
+    const processArguments = config.get<string[]>('arguments');
+    const additionalIncludePackages = config.get<string[]>('additionalIncludePackages');
+    const trackedFileExtensions = config.get<string[]>('trackedFileExtensions');
 
     const commandChannel = new MessageChannel();
     const stdinChannel = new MessageChannel();
@@ -128,7 +143,9 @@ export class ClangdContext implements vscode.Disposable {
       commandPort: commandChannel.port2,
       stdinPort: stdinChannel.port2,
       stdoutPort: stdoutChannel.port2,
-      stderrPort: stderrChannel.port2
+      stderrPort: stderrChannel.port2,
+      arguments: processArguments,
+      additionalPackage: additionalIncludePackages,
     };
 
     const clangdProcess =
@@ -158,7 +175,7 @@ export class ClangdContext implements vscode.Disposable {
           commandPort.postMessage({
             type: 'create',
             data: {
-              path: filePath.path,
+              path: encodeUri(filePath).path,
               buffer: content.buffer,
               offset: content.byteOffset,
               length: content.byteLength
@@ -178,7 +195,7 @@ export class ClangdContext implements vscode.Disposable {
       }
 
       commandPort.postMessage(
-          {type: 'create', data: {path: uri.path, buffer: buffer}});
+          {type: 'create', data: {path: encodeUri(uri).path, buffer: buffer}});
     });
 
     vscode.workspace.onDidChangeTextDocument(e => {
@@ -189,8 +206,14 @@ export class ClangdContext implements vscode.Disposable {
         return;
       }
 
+      const extention = path.extname(uri.path);
+
+      if (!trackedFileExtensions.includes(extention)) {
+        return;
+      }
+
       commandPort.postMessage(
-          {type: 'change', data: {path: uri.path, buffer: buffer}});
+          {type: 'change', data: {path: encodeUri(uri).path, buffer: buffer}});
     });
 
     const clientOptions: vscodelc.LanguageClientOptions = {

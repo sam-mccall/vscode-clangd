@@ -60,7 +60,7 @@ const browserServerConfig = {
 	target: 'webworker', // web extensions run in a webworker context
 	entry: {
 		server: './src/server.ts',
-		serverProcess: './src/serverProcess.js',
+		serverProcess: './src/serverProcess.ts',
 	},
 	resolve: {
 		mainFields: ['module', 'main'],
@@ -68,7 +68,8 @@ const browserServerConfig = {
 		alias: {},
 		fallback: {
             "util": require.resolve("util/"),
-			"path": require.resolve("path-browserify")
+			"path": require.resolve("path-browserify"),
+			"url": require.resolve("url/")
 		},
 	},
 	module: {

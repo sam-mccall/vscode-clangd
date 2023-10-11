@@ -4,4 +4,5 @@
 !doc-assets/**
 !icon.png
 !dist/
+!clangd/
 !package.json
